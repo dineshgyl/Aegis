@@ -1181,7 +1181,14 @@ public class EditEntryActivity extends AegisActivity {
             _searchNavigationButtons.setVisibility(View.GONE);
             _btnSearchPrev.setEnabled(false);
             _btnSearchNext.setEnabled(false);
-            _textNote.setKeyListener((android.text.method.KeyListener) _textNote.getTag());
+            // Restore KeyListener - if tag is null, get a new one from a fresh EditText
+            android.text.method.KeyListener savedKeyListener = (android.text.method.KeyListener) _textNote.getTag();
+            if (savedKeyListener != null) {
+                _textNote.setKeyListener(savedKeyListener);
+            } else {
+                // If no saved KeyListener, restore default for EditText
+                _textNote.setKeyListener(android.text.method.TextKeyListener.getInstance());
+            }
             return;
         }
         
