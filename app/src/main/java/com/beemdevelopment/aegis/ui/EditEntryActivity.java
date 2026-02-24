@@ -126,6 +126,8 @@ public class EditEntryActivity extends AegisActivity {
     private TextInputEditText _textNoteSearch;
     private ImageView _btnSearchPrev;
     private ImageView _btnSearchNext;
+    private ImageView _btnNoteSearchMinimize;
+    private com.google.android.material.floatingactionbutton.FloatingActionButton _btnSearchMinimized;
     private LinearLayout _searchNavigationButtons;
     private TextView _textMatchCounter;
     private com.google.android.material.card.MaterialCardView _floatingSearchBar;
@@ -135,6 +137,7 @@ public class EditEntryActivity extends AegisActivity {
     
     private List<Integer> _searchMatches = new ArrayList<>();
     private int _currentMatchIndex = -1;
+    private boolean _isSearchBarMinimized = false;
     
     private float _dX, _dY;
     private float _lastTouchX, _lastTouchY;
@@ -230,6 +233,8 @@ public class EditEntryActivity extends AegisActivity {
         _textNoteSearch = findViewById(R.id.text_note_search);
         _btnSearchPrev = findViewById(R.id.btn_search_prev);
         _btnSearchNext = findViewById(R.id.btn_search_next);
+        _btnNoteSearchMinimize = findViewById(R.id.btn_note_search_minimize);
+        _btnSearchMinimized = findViewById(R.id.btn_search_minimized);
         _searchNavigationButtons = findViewById(R.id.search_navigation_buttons);
         _textMatchCounter = findViewById(R.id.text_match_counter);
         _floatingSearchBar = findViewById(R.id.floating_search_bar);
@@ -237,29 +242,34 @@ public class EditEntryActivity extends AegisActivity {
         _scrollView = findViewById(R.id.scroll_view);
         _textLastUsed = findViewById(R.id.text_last_used);
         
-        // Make floating search bar draggable
+        // Make floating search bar and minimized button draggable
         setupDraggableSearchBar();
+        setupDraggableMinimizedButton();
         
-        // Show floating search bar when note field gets focus
+        // Show floating search bar when note field gets focus (only if not minimized)
         _textNote.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
+            if (hasFocus && !_isSearchBarMinimized) {
                 _floatingSearchBar.setVisibility(View.VISIBLE);
+                _btnSearchMinimized.setVisibility(View.GONE);
             } else {
                 // Only hide if search box doesn't have focus and search is empty
-                if (!_textNoteSearch.hasFocus() && _textNoteSearch.getText().toString().isEmpty()) {
+                if (!_textNoteSearch.hasFocus() && _textNoteSearch.getText().toString().isEmpty() && !_isSearchBarMinimized) {
                     _floatingSearchBar.setVisibility(View.GONE);
+                    _btnSearchMinimized.setVisibility(View.GONE);
                 }
             }
         });
         
-        // Keep search bar visible when search box has focus
+        // Keep search bar visible when search box has focus (only if not minimized)
         _textNoteSearch.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
+            if (hasFocus && !_isSearchBarMinimized) {
                 _floatingSearchBar.setVisibility(View.VISIBLE);
+                _btnSearchMinimized.setVisibility(View.GONE);
             } else {
                 // Only hide if note field doesn't have focus and search is empty
-                if (!_textNote.hasFocus() && _textNoteSearch.getText().toString().isEmpty()) {
+                if (!_textNote.hasFocus() && _textNoteSearch.getText().toString().isEmpty() && !_isSearchBarMinimized) {
                     _floatingSearchBar.setVisibility(View.GONE);
+                    _btnSearchMinimized.setVisibility(View.GONE);
                 }
             }
         });
@@ -272,6 +282,22 @@ public class EditEntryActivity extends AegisActivity {
         // Set up navigation buttons
         _btnSearchPrev.setOnClickListener(v -> navigateToPreviousMatch());
         _btnSearchNext.setOnClickListener(v -> navigateToNextMatch());
+        
+        // Set up minimize button - collapse to small floating button
+        _btnNoteSearchMinimize.setOnClickListener(v -> {
+            _isSearchBarMinimized = true;
+            _textNoteSearch.clearFocus();
+            _textNote.clearFocus();
+            _floatingSearchBar.setVisibility(View.GONE);
+            _btnSearchMinimized.setVisibility(View.VISIBLE);
+        });
+        
+        // Set up maximize button - expand back to full search bar
+        _btnSearchMinimized.setOnClickListener(v -> {
+            _isSearchBarMinimized = false;
+            _floatingSearchBar.setVisibility(View.VISIBLE);
+            _btnSearchMinimized.setVisibility(View.GONE);
+        });
         _dropdownType = findViewById(R.id.dropdown_type);
         DropdownHelper.fillDropdown(this, _dropdownType, R.array.otp_types_array);
         _dropdownAlgoLayout = findViewById(R.id.dropdown_algo_layout);
@@ -1096,6 +1122,55 @@ public class EditEntryActivity extends AegisActivity {
         });
     }
     
+    private void setupDraggableMinimizedButton() {
+        // Make the minimized button draggable
+        _btnSearchMinimized.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    _dX = _btnSearchMinimized.getX() - event.getRawX();
+                    _dY = _btnSearchMinimized.getY() - event.getRawY();
+                    _lastTouchX = event.getRawX();
+                    _lastTouchY = event.getRawY();
+                    // Prevent parent from intercepting touch events
+                    _btnSearchMinimized.getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                    
+                case android.view.MotionEvent.ACTION_MOVE:
+                    float newX = event.getRawX() + _dX;
+                    float newY = event.getRawY() + _dY;
+                    
+                    // Get parent dimensions
+                    View parent = (View) _btnSearchMinimized.getParent();
+                    int parentWidth = parent.getWidth();
+                    int parentHeight = parent.getHeight();
+                    
+                    // Keep within parent bounds with some padding
+                    newX = Math.max(0, Math.min(newX, parentWidth - _btnSearchMinimized.getWidth()));
+                    newY = Math.max(0, Math.min(newY, parentHeight - _btnSearchMinimized.getHeight()));
+                    
+                    _btnSearchMinimized.setX(newX);
+                    _btnSearchMinimized.setY(newY);
+                    
+                    // Prevent parent from intercepting
+                    _btnSearchMinimized.getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                    
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    // Check if this was a click (minimal movement)
+                    float deltaX = Math.abs(event.getRawX() - _lastTouchX);
+                    float deltaY = Math.abs(event.getRawY() - _lastTouchY);
+                    if (deltaX < 10 && deltaY < 10) {
+                        // This was a click, perform the click action
+                        v.performClick();
+                    }
+                    _btnSearchMinimized.getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+            }
+            return false;
+        });
+    }
+    
     private void searchInNote(String query) {
         String noteText = _textNote.getText().toString();
         _searchMatches.clear();
@@ -1239,9 +1314,9 @@ public class EditEntryActivity extends AegisActivity {
                 });
             }
             
-            // Update button states
-            _btnSearchPrev.setEnabled(_currentMatchIndex > 0);
-            _btnSearchNext.setEnabled(_currentMatchIndex < _searchMatches.size() - 1);
+            // Keep buttons always enabled to allow wrap-around navigation
+            _btnSearchPrev.setEnabled(true);
+            _btnSearchNext.setEnabled(true);
         }
     }
     

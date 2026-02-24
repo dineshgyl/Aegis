@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name" translatable="false">Aegis</string>
-    <string name="app_name_full" translatable="false">Aegis Authenticator</string>
+    <string name="app_name" translatable="false">AegisB</string>
+    <string name="app_name_full" translatable="false">Aegis AuthenticatorB</string>
     <string name="org_name_full" translatable="false">Beem Development</string>
     <string name="action_settings">Settings</string>
     <string name="action_about">About</string>
@@ -373,6 +373,8 @@
     <string name="note" comment="Users can add a note to an entry">Note</string>
     <string name="search_note">Search in note</string>
     <string name="previous_match">Previous match</string>
+    <string name="minimize">Minimize</string>
+    <string name="maximize">Maximize</string>
     <string name="next_match">Next match</string>
     <string name="clear">Clear</string>
 
