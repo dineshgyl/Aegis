@@ -371,6 +371,9 @@
     <string name="preference_reset_usage_count_summary">Reset the usage count of every entry in your vault</string>
     <string name="preference_reset_usage_count_dialog">Are you sure you want to set the usage count of every entry in your vault to 0?</string>
     <string name="note" comment="Users can add a note to an entry">Note</string>
+    <string name="search_note">Search in note</string>
+    <string name="previous_match">Previous match</string>
+    <string name="next_match">Next match</string>
     <string name="clear">Clear</string>
 
     <string name="dialog_duplicate_entry_title" comment="'Duplicate' is a noun here">Duplicate entry</string>

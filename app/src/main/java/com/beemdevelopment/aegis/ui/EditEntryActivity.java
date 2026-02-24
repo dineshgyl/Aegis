@@ -123,7 +123,21 @@ public class EditEntryActivity extends AegisActivity {
     private LinearLayout _textPinLayout;
     private TextInputEditText _textUsageCount;
     private TextInputEditText _textNote;
+    private TextInputEditText _textNoteSearch;
+    private ImageView _btnSearchPrev;
+    private ImageView _btnSearchNext;
+    private LinearLayout _searchNavigationButtons;
+    private TextView _textMatchCounter;
+    private com.google.android.material.card.MaterialCardView _floatingSearchBar;
+    private View _dragHandleSearch;
+    private androidx.core.widget.NestedScrollView _scrollView;
     private TextView _textLastUsed;
+    
+    private List<Integer> _searchMatches = new ArrayList<>();
+    private int _currentMatchIndex = -1;
+    
+    private float _dX, _dY;
+    private float _lastTouchX, _lastTouchY;
 
     private AutoCompleteTextView _dropdownType;
     private AutoCompleteTextView _dropdownAlgo;
@@ -213,7 +227,51 @@ public class EditEntryActivity extends AegisActivity {
         _textPinLayout = findViewById(R.id.layout_pin);
         _textUsageCount = findViewById(R.id.text_usage_count);
         _textNote = findViewById(R.id.text_note);
+        _textNoteSearch = findViewById(R.id.text_note_search);
+        _btnSearchPrev = findViewById(R.id.btn_search_prev);
+        _btnSearchNext = findViewById(R.id.btn_search_next);
+        _searchNavigationButtons = findViewById(R.id.search_navigation_buttons);
+        _textMatchCounter = findViewById(R.id.text_match_counter);
+        _floatingSearchBar = findViewById(R.id.floating_search_bar);
+        _dragHandleSearch = findViewById(R.id.drag_handle_search);
+        _scrollView = findViewById(R.id.scroll_view);
         _textLastUsed = findViewById(R.id.text_last_used);
+        
+        // Make floating search bar draggable
+        setupDraggableSearchBar();
+        
+        // Show floating search bar when note field gets focus
+        _textNote.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                _floatingSearchBar.setVisibility(View.VISIBLE);
+            } else {
+                // Only hide if search box doesn't have focus and search is empty
+                if (!_textNoteSearch.hasFocus() && _textNoteSearch.getText().toString().isEmpty()) {
+                    _floatingSearchBar.setVisibility(View.GONE);
+                }
+            }
+        });
+        
+        // Keep search bar visible when search box has focus
+        _textNoteSearch.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                _floatingSearchBar.setVisibility(View.VISIBLE);
+            } else {
+                // Only hide if note field doesn't have focus and search is empty
+                if (!_textNote.hasFocus() && _textNoteSearch.getText().toString().isEmpty()) {
+                    _floatingSearchBar.setVisibility(View.GONE);
+                }
+            }
+        });
+        
+        // Set up note search functionality
+        _textNoteSearch.addTextChangedListener(new SimpleTextWatcher(s -> {
+            searchInNote(s.toString());
+        }));
+        
+        // Set up navigation buttons
+        _btnSearchPrev.setOnClickListener(v -> navigateToPreviousMatch());
+        _btnSearchNext.setOnClickListener(v -> navigateToNextMatch());
         _dropdownType = findViewById(R.id.dropdown_type);
         DropdownHelper.fillDropdown(this, _dropdownType, R.array.otp_types_array);
         _dropdownAlgoLayout = findViewById(R.id.dropdown_algo_layout);
@@ -996,6 +1054,245 @@ public class EditEntryActivity extends AegisActivity {
             stopEditingIcon(false);
         }
     }
+    private void setupDraggableSearchBar() {
+        // Make only the drag handle draggable, not the entire card
+        _dragHandleSearch.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    _dX = _floatingSearchBar.getX() - event.getRawX();
+                    _dY = _floatingSearchBar.getY() - event.getRawY();
+                    _lastTouchX = event.getRawX();
+                    _lastTouchY = event.getRawY();
+                    // Prevent parent from intercepting touch events
+                    _floatingSearchBar.getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                    
+                case android.view.MotionEvent.ACTION_MOVE:
+                    float newX = event.getRawX() + _dX;
+                    float newY = event.getRawY() + _dY;
+                    
+                    // Get parent dimensions
+                    View parent = (View) _floatingSearchBar.getParent();
+                    int parentWidth = parent.getWidth();
+                    int parentHeight = parent.getHeight();
+                    
+                    // Keep within parent bounds with some padding
+                    newX = Math.max(0, Math.min(newX, parentWidth - _floatingSearchBar.getWidth()));
+                    newY = Math.max(0, Math.min(newY, parentHeight - _floatingSearchBar.getHeight()));
+                    
+                    _floatingSearchBar.setX(newX);
+                    _floatingSearchBar.setY(newY);
+                    
+                    // Prevent parent from intercepting
+                    _floatingSearchBar.getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                    
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    _floatingSearchBar.getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+            }
+            return false;
+        });
+    }
+    
+    private void searchInNote(String query) {
+        String noteText = _textNote.getText().toString();
+        _searchMatches.clear();
+        _currentMatchIndex = -1;
+        
+        if (query.isEmpty() || noteText.isEmpty()) {
+            // Clear selection, hide navigation buttons, and make note editable again
+            _searchNavigationButtons.setVisibility(View.GONE);
+            _btnSearchPrev.setEnabled(false);
+            _btnSearchNext.setEnabled(false);
+            _textNote.setKeyListener((android.text.method.KeyListener) _textNote.getTag());
+            return;
+        }
+        
+        // Make note field read-only while searching (but keep it focusable for selection)
+        if (_textNote.getTag() == null) {
+            _textNote.setTag(_textNote.getKeyListener());
+        }
+        _textNote.setKeyListener(null);
+        
+        // Find all occurrences of the search query (case-insensitive)
+        String lowerNoteText = noteText.toLowerCase();
+        String lowerQuery = query.toLowerCase();
+        int index = 0;
+        
+        while ((index = lowerNoteText.indexOf(lowerQuery, index)) != -1) {
+            _searchMatches.add(index);
+            index += query.length();
+        }
+        
+        if (!_searchMatches.isEmpty()) {
+            // Show navigation buttons and update counter
+            _searchNavigationButtons.setVisibility(View.VISIBLE);
+            _currentMatchIndex = -1; // Set to -1 so first arrow click goes to index 0
+            updateMatchCounter();
+            // Update button states - enable both buttons to navigate
+            _btnSearchPrev.setEnabled(true);
+            _btnSearchNext.setEnabled(true);
+        } else {
+            // No matches found, hide navigation buttons
+            _searchNavigationButtons.setVisibility(View.GONE);
+            _btnSearchPrev.setEnabled(false);
+            _btnSearchNext.setEnabled(false);
+        }
+    }
+    
+    private void updateMatchCounter() {
+        if (!_searchMatches.isEmpty()) {
+            if (_currentMatchIndex >= 0) {
+                String counterText = (_currentMatchIndex + 1) + "/" + _searchMatches.size();
+                _textMatchCounter.setText(counterText);
+            } else {
+                // Before first navigation, show "0/total"
+                String counterText = "0/" + _searchMatches.size();
+                _textMatchCounter.setText(counterText);
+            }
+        }
+    }
+    
+    private void highlightCurrentMatch(int queryLength, boolean requestFocus) {
+        if (_currentMatchIndex >= 0 && _currentMatchIndex < _searchMatches.size()) {
+            int start = _searchMatches.get(_currentMatchIndex);
+            int end = start + queryLength;
+            
+            // Update match counter
+            updateMatchCounter();
+            
+            // Only highlight and scroll when navigating with arrow keys
+            if (requestFocus) {
+                _textNote.post(() -> {
+                    try {
+                        _textNote.requestFocus();
+                        _textNote.setSelection(start, end);
+                        
+                        // Listen for layout changes to detect when keyboard is hidden
+                        final int[] previousHeight = {_scrollView.getHeight()};
+                        final long startTime = System.currentTimeMillis();
+                        final android.view.ViewTreeObserver.OnGlobalLayoutListener[] listenerRef = new android.view.ViewTreeObserver.OnGlobalLayoutListener[1];
+                        
+                        listenerRef[0] = new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                            @Override
+                            public void onGlobalLayout() {
+                                int currentHeight = _scrollView.getHeight();
+                                long elapsed = System.currentTimeMillis() - startTime;
+                                
+                                // If height increased, keyboard was hidden - scroll immediately
+                                if (currentHeight > previousHeight[0]) {
+                                    try {
+                                        _scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(listenerRef[0]);
+                                    } catch (Exception e) {
+                                        // Ignore
+                                    }
+                                    
+                                    // Now calculate scroll position with correct viewport height
+                                    _textNote.post(() -> {
+                                        android.text.Layout layout = _textNote.getLayout();
+                                        if (layout != null) {
+                                            int line = layout.getLineForOffset(start);
+                                            int lineTop = layout.getLineTop(line);
+                                            int lineHeight = layout.getLineBottom(line) - lineTop;
+                                            
+                                            // Get the Y position of the match within the note field
+                                            int matchYInNote = lineTop;
+                                            
+                                            // Get the note field's position relative to the scroll view
+                                            int[] noteLocation = new int[2];
+                                            int[] scrollLocation = new int[2];
+                                            _textNote.getLocationOnScreen(noteLocation);
+                                            _scrollView.getLocationOnScreen(scrollLocation);
+                                            int noteOffsetInScroll = noteLocation[1] - scrollLocation[1] + _scrollView.getScrollY();
+                                            
+                                            // Calculate the absolute Y position of the match in the scroll view
+                                            int matchAbsoluteY = noteOffsetInScroll + matchYInNote;
+                                            
+                                            // Calculate target scroll to center the match (accounting for line height)
+                                            int targetScrollY = matchAbsoluteY - (currentHeight / 2) + (lineHeight / 2);
+                                            
+                                            // Ensure we don't scroll beyond bounds
+                                            targetScrollY = Math.max(0, targetScrollY);
+                                            int maxScroll = _scrollView.getChildAt(0).getHeight() - currentHeight;
+                                            targetScrollY = Math.min(targetScrollY, Math.max(0, maxScroll));
+                                            
+                                            _scrollView.smoothScrollTo(0, targetScrollY);
+                                        }
+                                    });
+                                } else if (elapsed > 500) {
+                                    // Timeout after 500ms - remove listener to prevent ANR
+                                    try {
+                                        _scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(listenerRef[0]);
+                                    } catch (Exception e) {
+                                        // Ignore
+                                    }
+                                }
+                                previousHeight[0] = currentHeight;
+                            }
+                        };
+                        _scrollView.getViewTreeObserver().addOnGlobalLayoutListener(listenerRef[0]);
+                    } catch (Exception e) {
+                        // Handle any exceptions
+                    }
+                });
+            }
+            
+            // Update button states
+            _btnSearchPrev.setEnabled(_currentMatchIndex > 0);
+            _btnSearchNext.setEnabled(_currentMatchIndex < _searchMatches.size() - 1);
+        }
+    }
+    
+    private void navigateToPreviousMatch() {
+        if (_searchMatches.isEmpty()) {
+            return;
+        }
+        
+        // Hide keyboard
+        hideKeyboard();
+        
+        if (_currentMatchIndex < 0) {
+            // First navigation - go to last match
+            _currentMatchIndex = _searchMatches.size() - 1;
+        } else if (_currentMatchIndex > 0) {
+            _currentMatchIndex--;
+        } else {
+            // Wrap around to last match
+            _currentMatchIndex = _searchMatches.size() - 1;
+        }
+        highlightCurrentMatch(_textNoteSearch.getText().toString().length(), true);
+    }
+    
+    private void navigateToNextMatch() {
+        if (_searchMatches.isEmpty()) {
+            return;
+        }
+        
+        // Hide keyboard
+        hideKeyboard();
+        
+        if (_currentMatchIndex < 0) {
+            // First navigation - go to first match
+            _currentMatchIndex = 0;
+        } else if (_currentMatchIndex < _searchMatches.size() - 1) {
+            _currentMatchIndex++;
+        } else {
+            // Wrap around to first match
+            _currentMatchIndex = 0;
+        }
+        highlightCurrentMatch(_textNoteSearch.getText().toString().length(), true);
+    }
+    
+    private void hideKeyboard() {
+        android.view.inputmethod.InputMethodManager imm =
+            (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        if (imm != null && getCurrentFocus() != null) {
+            imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+        }
+    }
+
 
     private static class ParseException extends Exception {
         public ParseException(String message) {
