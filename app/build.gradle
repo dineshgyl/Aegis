@@ -15,7 +15,8 @@ def getCmdOutput = { cmd ->
 def getGitHash = { -> return getCmdOutput(["git", "rev-parse", "--short", "HEAD"]) }
 def getGitBranch = { -> return getCmdOutput(["git", "rev-parse", "--abbrev-ref", "HEAD"]) }
 
-def packageName = "com.beemdevelopment.aegisb"
+def packageName = "com.beemdevelopment.aegis"
+def packageName2 = "com.beemdevelopment.aegisb"
 def fileProviderAuthority = "${packageName}.fileprovider"
 def fileProviderAuthorityDebug = "${packageName}.debug.fileprovider"
 
@@ -25,7 +26,7 @@ android {
     namespace packageName
 
     defaultConfig {
-        applicationId "${packageName}"
+        applicationId "${packageName2}"
         minSdkVersion 23
         targetSdkVersion 35
         versionCode 81
