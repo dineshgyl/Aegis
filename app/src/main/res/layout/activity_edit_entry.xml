@@ -173,7 +173,11 @@
                                 android:id="@+id/text_note"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:inputType="text|textMultiLine|textCapSentences"/>
+                                android:inputType="textNoSuggestions|textMultiLine"
+                                android:imeOptions="flagNoExtractUi|flagNoFullscreen"
+                                android:focusable="true"
+                                android:focusableInTouchMode="true"
+                                android:scrollHorizontally="false"/>
                         </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
                     <LinearLayout
