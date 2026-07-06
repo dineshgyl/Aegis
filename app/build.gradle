@@ -29,10 +29,11 @@ android {
         minSdkVersion 23
         targetSdkVersion 35
         versionCode 81
-        versionName "3.4.2b"
+        versionName "3.4.2b1"
         multiDexEnabled true
         buildConfigField "String", "GIT_HASH", "\"${getGitHash()}\""
         buildConfigField "String", "GIT_BRANCH", "\"${getGitBranch()}\""
+        buildConfigField "String", "BUILD_TIME", "\"${new Date().format('yyyyMMddHHmmss')}\""
         buildConfigField "java.util.concurrent.atomic.AtomicBoolean", "TEST", "new java.util.concurrent.atomic.AtomicBoolean(false)"
 
         javaCompileOptions {

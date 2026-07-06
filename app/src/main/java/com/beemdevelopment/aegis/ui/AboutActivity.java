@@ -110,10 +110,9 @@ public class AboutActivity extends AegisActivity {
 
     private static String getCurrentAppVersion() {
         if (BuildConfig.DEBUG) {
-            return String.format("%s-%s (%s)", BuildConfig.VERSION_NAME, BuildConfig.GIT_HASH, BuildConfig.GIT_BRANCH);
+            return String.format("%s-%s (%s)\nBuilt: %s", BuildConfig.VERSION_NAME, BuildConfig.GIT_HASH, BuildConfig.GIT_BRANCH, BuildConfig.BUILD_TIME);
         }
-
-        return BuildConfig.VERSION_NAME;
+        return String.format("%s\nBuilt: %s", BuildConfig.VERSION_NAME, BuildConfig.BUILD_TIME);
     }
 
     private void openUrl(String url) {
