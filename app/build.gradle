@@ -27,9 +27,9 @@ android {
     defaultConfig {
         applicationId "${packageName}"
         minSdkVersion 23
-        targetSdkVersion 35
-        versionCode 81
-        versionName "3.4.2b1"
+        targetSdkVersion 36
+        versionCode 82
+        versionName "3.4.3"
         multiDexEnabled true
         buildConfigField "String", "GIT_HASH", "\"${getGitHash()}\""
         buildConfigField "String", "GIT_BRANCH", "\"${getGitBranch()}\""
